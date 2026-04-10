@@ -4,6 +4,10 @@
 
 from PIL import Image
 
+class _Helpers:
+    def hexDigits(num: int):
+        return len(hex(num))-2
+
 class Compression:
     colorList = []
     pixels = []
@@ -43,7 +47,7 @@ class Compression:
         return "".join(header)
 
     def buildPixelString(self):
-        skip = 1 if len(self.colorList) < 9 else 0
+        skip = 1 if _Helpers.hexDigits(len(self.colorList)) > 1 else 0
 
         return "".join(pixel.to_bytes(1, 'big').hex()[skip:] for pixel in self.pixels)
 
@@ -56,21 +60,68 @@ class Compression:
 
         return retVal
     
+    #decompression side
+    def decompressToImage(self, hex: str):
+        if len(hex) > 10:
+            
+            self.width = int(hex[:4], 16)
+            self.height = int(hex[4:8], 16)
+            
+            #fill color list
+            self.colorList = []
+
+            colorListLength = int(hex[8:10], 16)
+            colorListString = hex[10:(10 + (colorListLength * 6))]
+            pixelString = hex[(10 + (colorListLength * 6)):]
+
+            for color in range(0, colorListLength):
+                #need to add checking for lengths greater than 16
+                index = color * 6
+                
+                #separate RGB values
+                red = int(colorListString[index:index+2],16)
+                green = int(colorListString[index+2:index+4], 16)
+                blue = int(colorListString[index+4:index+6], 16)
+
+                self.colorList.append([red,green, blue])
+
+            #fill image pixels
+            outImage = Image.new("RGB", (self.width, self.height))
+            
+            pixelIndex = 0
+            pixelSize = 2 if _Helpers.hexDigits(colorListLength) > 1 else 1
+
+            for y in range(0, self.height):
+                for x in range(0, self.width):
+                    outImage.putpixel((x, y), tuple(self.colorList[int(pixelString[pixelIndex: pixelIndex + pixelSize])]))
+                    pixelIndex = pixelIndex + pixelSize
+
+            #save image
+            outImage.save("outImage.bmp", format="BMP")
+
+
+
     
-file = Image.open("C:\git\PythonLearning\inputImage.bmp")
+    
+# with Image.open("C:\git\PythonLearning\inputImage.bmp") as file:
 
-converted = file.convert('RGB')
+#     converted = file.convert('RGB')
 
-compress = Compression(converted)
+#     compress = Compression(converted)
 
-compressedPixels = compress.compressionString()[40:]
+#     with open("outCompress.txt", "w") as compressedFile:
+#         compressedFile.write(compress.compressionString())
 
-chunks = [compressedPixels[i:i+(converted.width)] for i in range(0, len(compressedPixels), (converted.width))]
+with open("outCompress.txt") as file:
+    outImage = Image.Image()
+    compress = Compression(outImage)
+    compress.decompressToImage(file.read())
 
-print('\n'.join(chunks))
+    print(compress.width)
+    print(compress.height)
+    print(compress.colorList)
 
 
-file.close()
 
 
 
